@@ -5,12 +5,19 @@ CSS=$(subst .tiny,,$(shell find themes -type f -name '*.css'))
 COMPRESSED_CSS := $(patsubst %.css,%.tiny.css,$(CSS))
 PWD=`pwd`
 
+# hosting variables
+SLEEP_TIME=300
+EXCLUDE=--exclude=*.tar.gz --exclude=*~ $(EXCLUDE-FILES)
+ALL_BUT_GZ=$(subst $(wildcard *.tar.gz),,$(wildcard *))
+DATADIR=/usr/share/plinth
+PYDIR=$(DATADIR)/python/plinth
+
 ## Catch-all tagets
-default: predepend config dirs template css docs dbs
+default: config dirs template css docs dbs
 all: default
 
 predepend:
-	sudo sh -c "apt-get install augeas-tools python-bjsonrpc python-augeas python-simplejson pandoc python-cheetah python-cherrypy3"
+	sudo sh -c "apt-get install augeas-tools libpython2.7 pandoc psmisc python2.7 python-augeas python-bjsonrpc python-cheetah python-cherrypy3 python-simplejson sudo"
 	git submodule init
 	git submodule update
 	touch predepend
@@ -18,21 +25,12 @@ predepend:
 install: default
 	mkdir -p $(DESTDIR)/etc/init.d $(DESTDIR)/etc/plinth
 	cp plinth.sample.fhs.config $(DESTDIR)/etc/plinth/plinth.config
-	mkdir -p $(DESTDIR)/usr/lib/python2.7/plinth $(DESTDIR)/usr/bin \
+	mkdir -p $(DESTDIR)$(PYDIR) $(DESTDIR)$(DATADIR) $(DESTDIR)/usr/bin \
 		$(DESTDIR)/usr/share/doc/plinth $(DESTDIR)/usr/share/man/man1
-	rsync -L doc/* $(DESTDIR)/usr/share/doc/plinth/
-	gzip $(DESTDIR)/usr/share/doc/plinth/plinth.1 
-	mv $(DESTDIR)/usr/share/doc/plinth/plinth.1.gz $(DESTDIR)/usr/share/man/man1
-	rsync -rl *.py modules templates vendor themes static \
-		--exclude static/doc --exclude ".git/*" --exclude "*.pyc" \
-		$(DESTDIR)/usr/lib/python2.7/plinth
-	mkdir -p $(DESTDIR)/usr/lib/python2.7/plinth/static/doc
-	cp doc/*.html $(DESTDIR)/usr/lib/python2.7/plinth/static/doc
-	rm -f $(DESTDIR)/usr/lib/python2.7/plinth/plinth.config
-	ln -s ../../../../etc/plinth/plinth.config $(DESTDIR)/usr/lib/python2.7/plinth/plinth.config
+	cp -a static themes $(DESTDIR)$(DATADIR)/
+	cp -a *.py modules templates $(DESTDIR)$(PYDIR)/
 	cp share/init.d/plinth $(DESTDIR)/etc/init.d
-	rm -f $(DESTDIR)/usr/bin/plinth
-	ln -s ../lib/python2.7/plinth/plinth.py $(DESTDIR)/usr/bin/plinth
+	install plinth $(DESTDIR)/usr/bin/
 	mkdir -p $(DESTDIR)/var/lib/plinth/cherrypy_sessions $(DESTDIR)/var/log/plinth $(DESTDIR)/var/run
 	cp -r data/* $(DESTDIR)/var/lib/plinth
 	rm -f $(DESTDIR)/var/lib/plinth/users/sqlite3.distrib
@@ -82,3 +80,13 @@ clean:
 	@$(MAKE) -s -C templates clean
 	rm -rf $(BUILDDIR) $(DESTDIR)
 	rm -f predepend
+
+hosting:
+	bash start.sh &
+	while [ 1 ]; do make current-checkout.tar.gz current-repository.tar.gz; sleep $(SLEEP_TIME); done
+
+current-checkout.tar.gz: $(ALL_BUT_GZ)
+	tar cz $(EXCLUDE) * > current-checkout.tar.gz
+
+current-repository.tar.gz: $(ALL_BUT_GZ)
+	tar cz $(EXCLUDE) * .git > current-repository.tar.gz
