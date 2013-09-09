@@ -17,8 +17,8 @@ import util as u
 from logger import Logger
 #from modules.auth import AuthController, require, member_of, name_is
 
-from vendor.withsqlite.withsqlite import sqlite_db
-from vendor.exmachina.exmachina import ExMachinaClient
+from withsqlite.withsqlite import sqlite_db
+from exmachina.exmachina import ExMachinaClient
 import socket
 
 __version__ = "0.2.14"
@@ -114,13 +114,18 @@ def setup():
       pass
 
    try:
-      cfg.exmachina = ExMachinaClient(
-         secret_key=cfg.exmachina_secret_key or None)
-   except socket.error:
+      from exmachina import ExMachinaClient
+   except ImportError:
       cfg.exmachina = None
-      print "couldn't connect to exmachina daemon, but continuing anyways..."
+   else:
+      try:
+         cfg.exmachina = ExMachinaClient(
+            secret_key=cfg.exmachina_secret_key or None)
+      except socket.error:
+         cfg.exmachina = None
+         print "couldn't connect to exmachina daemon, but continuing anyways..."
 
-   os.chdir(cfg.file_root)
+   os.chdir(cfg.python_root)
    cherrypy.config.update({'error_page.404': error_page_404})
    cherrypy.config.update({'error_page.500': error_page_500})
    cfg.log = Logger()
@@ -138,25 +143,25 @@ def setup():
    server.subscribe()
 
    # Configure default server
-   cherrypy.config.update({'server.socket_host': cfg.host,
-                           'server.socket_port': cfg.port,
-                           'server.thread_pool':10,
-                           'tools.staticdir.root': cfg.file_root,
-                           'tools.sessions.on':True,
-                           'tools.auth.on':True,
-                           'tools.sessions.storage_type':"file",
-                           'tools.sessions.timeout':90,
-                           'tools.sessions.storage_path':"%s/cherrypy_sessions" % cfg.data_dir,
+   cherrypy.config.update(
+      {'server.socket_host': cfg.host,
+       'server.socket_port': cfg.port,
+       'server.thread_pool':10,
+       'tools.staticdir.root': cfg.file_root,
+       'tools.sessions.on':True,
+       'tools.auth.on':True,
+       'tools.sessions.storage_type':"file",
+       'tools.sessions.timeout':90,
+       'tools.sessions.storage_path':"%s/cherrypy_sessions" % cfg.data_dir,})
 
-                           })
-
-   config = {'/': {'tools.staticdir.root': '%s/static' % cfg.file_root,
-                   'tools.proxy.on':True,},
-             '/static': {'tools.staticdir.on': True,
-                         'tools.staticdir.dir':"."},
-             '/favicon.ico':{'tools.staticfile.on':True,
-                             'tools.staticfile.filename': "%s/static/theme/favicon.ico" % cfg.file_root}
-             }
+   config = {
+      '/': {'tools.staticdir.root': '%s/static' % cfg.file_root,
+            'tools.proxy.on': True,},
+      '/static': {'tools.staticdir.on': True,
+                  'tools.staticdir.dir': "."},
+      '/favicon.ico':{'tools.staticfile.on': True,
+                      'tools.staticfile.filename':
+                         "%s/static/theme/favicon.ico" % cfg.file_root}}
    cherrypy.tree.mount(cfg.html_root, '/', config=config)
    cherrypy.engine.signal_handler.subscribe()
 
