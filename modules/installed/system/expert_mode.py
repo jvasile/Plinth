@@ -1,6 +1,10 @@
 import os
 import cherrypy
-import simplejson as json
+import sys
+if sys.version_info >= (2, 6):
+    import json
+else:
+    import simplejson as json
 from gettext import gettext as _
 from filedict import FileDict
 from modules.auth import require
