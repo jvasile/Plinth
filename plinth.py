@@ -55,6 +55,7 @@ class Root(plugin_mount.PagePlugin):
    def index(self):
       ## TODO: firstboot hijacking root should probably be in the firstboot module with a hook in plinth.py
       with sqlite_db(cfg.store_file, table="firstboot") as db:
+         db.make_db()
          if not 'state' in db:
             raise cherrypy.InternalRedirect('/firstboot')
          elif db['state'] < 5:
@@ -146,16 +147,20 @@ def setup():
                            'tools.auth.on':True,
                            'tools.sessions.storage_type':"file",
                            'tools.sessions.timeout':90,
-                           'tools.sessions.storage_path':"%s/cherrypy_sessions" % cfg.data_dir,
-
+                           'tools.sessions.storage_path': os.path.join(cfg.data_dir, 'cherrypy_sessions'),
                            })
 
-   config = {'/': {'tools.staticdir.root': '%s/static' % cfg.file_root,
+   try:
+      os.mkdir(cherrypy.config['tools.sessions.storage_path'], 0700)
+   except OSError:
+      pass
+
+   config = {'/': {'tools.staticdir.root': os.path.join(cfg.file_root, 'static'),
                    'tools.proxy.on':True,},
              '/static': {'tools.staticdir.on': True,
                          'tools.staticdir.dir':"."},
              '/favicon.ico':{'tools.staticfile.on':True,
-                             'tools.staticfile.filename': "%s/static/theme/favicon.ico" % cfg.file_root}
+                             'tools.staticfile.filename': os.path.join(cfg.data_dir, 'static', 'theme', 'favicon.ico')}
              }
    cherrypy.tree.mount(cfg.html_root, '/', config=config)
    cherrypy.engine.signal_handler.subscribe()

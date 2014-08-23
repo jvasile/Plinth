@@ -67,7 +67,11 @@ def page_template(template='login_nav', **kwargs):
     #if template=='base' and kwargs['sidebar_right']=='':
     #    template='two_col'
     if isinstance(template, basestring):
-        exec ("from templates.%s import %s as template" % (template, template))
+        try:
+           exec ("from templates.%s import %s as template" % (template, template))
+        except ImportError:
+           from Cheetah.Template import Template
+           template = Template.compile(file=sys.path[0] + os.path.sep + os.path.join('templates', template + '.tmpl'))
     try:
         submenu = cfg.main_menu.active_item().encode("sub_menu", render_subs=True)
     except AttributeError:
