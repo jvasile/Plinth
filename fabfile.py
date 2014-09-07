@@ -7,6 +7,11 @@
 # plinth box
 
 import os,sys, subprocess
+if sys.version_info >= (2, 6):
+    import json
+else:
+    import simplejson as json
+
 import simplejson as json
 import fabric.api
 from fabric.api import local, env, cd, put, get, task

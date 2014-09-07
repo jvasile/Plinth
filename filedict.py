@@ -5,7 +5,12 @@ Author: Erez Shinan
 Date  : 31-May-2009
 """
 
-import simplejson as json ## jlv replaced pickle with json
+import sys
+## jlv replaced pickle with json
+if sys.version_info >= (2, 6):
+    import json
+else:
+    import simplejson as json
  
 import UserDict
 ##import cPickle as pickle

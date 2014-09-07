@@ -7,7 +7,10 @@ haven't figured that one all the way through yet.
 
 import os, sys
 import cherrypy
-import simplejson as json
+if sys.version_info >= (2, 6):
+    import json
+else:
+    import simplejson as json
 from gettext import gettext as _
 from plugin_mount import PagePlugin
 from modules.auth import require

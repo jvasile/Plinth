@@ -10,7 +10,7 @@ default: predepend config dirs template css docs dbs
 all: default
 
 predepend:
-	sudo sh -c "apt-get install augeas-tools python-bjsonrpc python-augeas python-simplejson pandoc python-cheetah python-cherrypy3"
+	sudo sh -c "apt-get install augeas-tools python-bjsonrpc python-augeas pandoc python-cheetah python-cherrypy3"
 	git submodule init
 	git submodule update
 	touch predepend
