@@ -48,6 +48,7 @@ class FirstBoot(PagePlugin):
         ## Until LDAP is in place, we'll put the box name and key in the cfg.store_file
         ## Must resist the sick temptation to write an LDAP interface to the sqlite file
         with sqlite_db(cfg.store_file, table="thisbox", autocommit=True) as db:
+            db.make_db()
             db['about'] = "This table is for information about this FreedomBox"
             if box_name:
                 if self.valid_box_name_p(box_name): 
@@ -73,6 +74,7 @@ class FirstBoot(PagePlugin):
         if box_name and box_key and self.valid_box_name_p(box_name) and self.valid_box_key_p(box_key):
             ## Update state to 1 and head there
             with sqlite_db(cfg.store_file, table="firstboot", autocommit=True) as db:
+                db.make_db()
                 db['state']=1
             raise cherrypy.InternalRedirect('/firstboot/state1')
 
