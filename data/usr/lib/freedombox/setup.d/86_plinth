@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# Enable Apache modules required for Plinth.
+
+echo "Configuring Apache for Plinth..."
+
+make-ssl-cert generate-default-snakeoil
+a2enmod headers
+a2enmod proxy
+a2enmod proxy_http
+a2enmod rewrite
+a2enmod ssl
+a2enconf javascript-common
+a2ensite plinth.conf
+a2ensite plinth-ssl.conf
+
+echo "Done configuring Apache for Plinth."
+
+echo "Running Plinth setup..."
+
+# Run plinth setup to install various necessary program
+plinth --setup
+
+echo "Done running Plinth setup."

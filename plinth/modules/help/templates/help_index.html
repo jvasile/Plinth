@@ -1,0 +1,61 @@
+{% extends 'help_base.html' %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load i18n %}
+
+{% block content %}
+
+  <h2>{% trans "Help" %}</h2>
+
+  <p>
+    {% url 'help:manual' as manual_url %}
+    {% blocktrans trimmed %}
+      The <a href="{{ manual_url }}">{{ box_name }} Manual</a> is the
+      best place to start for information regarding {{ box_name }}.
+    {% endblocktrans %}
+  </p>
+
+  <p>
+    {% blocktrans trimmed %}
+      <a href="http://wiki.debian.org/FreedomBox" target="_blank">
+        {{ box_name }} project wiki </a> contains further information.
+    {% endblocktrans %}
+  </p>
+
+  <p>
+    {% blocktrans trimmed %}
+      To seek help from {{ box_name }} community, queries may be posted on
+      the
+      <a href="https://lists.alioth.debian.org/mailman/listinfo/freedombox-discuss">
+      mailing list</a>.  The list archives also contain information
+      about problems faced by other users and possible solutions.
+    {% endblocktrans %}
+  </p>
+
+  <p>
+    {% blocktrans trimmed %}
+      Many {{ box_name }} contributors and users are also available on
+      the irc.oftc.net IRC network.  Join and request help on the
+      <a href="https://webchat.oftc.net/?randomnick=1&channels=freedombox&prompt=1">
+      #freedombox</a> channel using the IRC web interface.
+    {% endblocktrans %}
+  </p>
+
+{% endblock %}

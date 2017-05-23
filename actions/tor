@@ -1,0 +1,368 @@
+#!/usr/bin/python3
+# -*- mode: python -*-
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Configuration helper for the Tor service
+"""
+
+import argparse
+import augeas
+import codecs
+import json
+import os
+import re
+import socket
+import time
+
+from plinth import action_utils
+from plinth.modules.tor.utils import get_real_apt_uri_path, iter_apt_uris, \
+                                     get_augeas, is_running, is_enabled, \
+                                     APT_TOR_PREFIX
+
+SERVICE_FILE = '/etc/firewalld/services/tor-{0}.xml'
+TOR_CONFIG = '/files/etc/tor/torrc'
+TOR_STATE_FILE = '/var/lib/tor/state'
+TOR_AUTH_COOKIE = '/var/run/tor/control.authcookie'
+
+
+def parse_arguments():
+    """Return parsed command line arguments as dictionary"""
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='subcommand', help='Sub command')
+
+    subparsers.add_parser('setup', help='Setup Tor configuration')
+    subparsers.add_parser('get-ports',
+                          help='Get Tor ports in JSON format')
+    subparsers.add_parser('get-hs',
+                          help='Get hidden service information in JSON format')
+
+    configure = subparsers.add_parser('configure', help='Configure Tor')
+    configure.add_argument('--service', choices=['enable', 'disable'],
+                           help='Configure Tor service')
+    configure.add_argument('--hidden-service', choices=['enable', 'disable'],
+                           help='Configure hidden service')
+    configure.add_argument('--apt-transport-tor',
+                           choices=['enable', 'disable'],
+                           help='Configure package download over Tor')
+
+    return parser.parse_args()
+
+
+def subcommand_setup(_):
+    """Setup Tor configuration after installing it."""
+    aug = augeas_load()
+
+    aug.set(TOR_CONFIG + '/#comment[last() + 1]',
+            'Run as non-exit bridge relay')
+    aug.set(TOR_CONFIG + '/SocksPort[1]', '[::]:9050')
+    aug.set(TOR_CONFIG + '/SocksPort[2]', '0.0.0.0:9050')
+    aug.set(TOR_CONFIG + '/ORPort', 'auto')
+    aug.set(TOR_CONFIG + '/ControlPort', '9051')
+    aug.set(TOR_CONFIG + '/BridgeRelay', '1')
+    aug.set(TOR_CONFIG + '/ExitPolicy[1]', 'reject *:*')
+    aug.set(TOR_CONFIG + '/ExitPolicy[2]', 'reject6 *:*')
+
+    aug.set(TOR_CONFIG + '/#comment[last() + 1]', 'Enable obfsproxy')
+    aug.set(TOR_CONFIG + '/ServerTransportPlugin',
+            'obfs3,obfs4 exec /usr/bin/obfs4proxy')
+    aug.set(TOR_CONFIG + '/ExtORPort', 'auto')
+
+    aug.set(TOR_CONFIG + '/#comment[last() + 1]', 'Enable transparent proxy')
+    aug.set(TOR_CONFIG + '/VirtualAddrNetworkIPv4', '10.192.0.0/10')
+    aug.set(TOR_CONFIG + '/AutomapHostsOnResolve', '1')
+    aug.set(TOR_CONFIG + '/TransPort[1]', '127.0.0.1:9040')
+    aug.set(TOR_CONFIG + '/TransPort[2]', '[::1]:9040')
+    aug.set(TOR_CONFIG + '/DNSPort[1]', '127.0.0.1:9053')
+    aug.set(TOR_CONFIG + '/DNSPort[2]', '[::1]:9053')
+
+    aug.set(TOR_CONFIG + '/HiddenServiceDir',
+            '/var/lib/tor/hidden_service')
+    aug.set(TOR_CONFIG + '/HiddenServicePort[1]',
+            '22 127.0.0.1:22')
+    aug.set(TOR_CONFIG + '/HiddenServicePort[2]',
+            '80 127.0.0.1:80')
+    aug.set(TOR_CONFIG + '/HiddenServicePort[3]',
+            '443 127.0.0.1:443')
+
+    aug.save()
+
+    action_utils.service_restart('tor')
+    _update_ports()
+
+    # wait until hidden service information is available
+    tries = 0
+    while not get_hidden_service()['enabled']:
+        tries += 1
+        if tries >= 12:
+            return
+
+        time.sleep(10)
+
+
+def subcommand_get_ports(_):
+    """Get Tor ports in JSON format."""
+    print(json.dumps(get_ports()))
+
+
+def subcommand_get_hs(_):
+    """Get hidden service information in JSON format."""
+    print(json.dumps(get_hidden_service()))
+
+
+def subcommand_configure(arguments):
+    """Configure Tor."""
+    if arguments.service == 'disable':
+        _disable()
+
+    restart = arguments.service == None
+    if arguments.hidden_service == 'enable':
+        _enable_hs(restart=restart)
+    elif arguments.hidden_service == 'disable':
+        _disable_hs(restart=restart)
+
+    if arguments.service == 'enable':
+        _enable()
+
+    if arguments.apt_transport_tor == 'enable':
+        _enable_apt_transport_tor()
+    elif arguments.apt_transport_tor == 'disable':
+        _disable_apt_transport_tor()
+
+
+def get_ports():
+    """Return dict mapping port names to numbers."""
+    ports = {}
+    try:
+        ports['orport'] = _get_orport()
+    except Exception:
+        pass
+
+    try:
+        with open(TOR_STATE_FILE, 'r') as state_file:
+            for line in state_file:
+                matches = re.match(
+                    r'^\s*TransportProxy\s+(\S*)\s+\S+:(\d+)\s*$', line)
+                if matches:
+                    ports[matches.group(1)] = matches.group(2)
+    except FileNotFoundError:
+        pass
+
+    return ports
+
+
+def _get_orport():
+    """Return the ORPort by querying running instance."""
+    cookie = open(TOR_AUTH_COOKIE, 'rb').read()
+    cookie = codecs.encode(cookie, 'hex').decode()
+
+    commands = '''AUTHENTICATE {cookie}
+GETINFO net/listeners/or
+QUIT
+'''.format(cookie=cookie)
+
+    tor_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    tor_socket.connect(('localhost', 9051))
+    tor_socket.send(commands.encode())
+    response = tor_socket.recv(1024)
+    tor_socket.close()
+
+    line = response.split(b'\r\n')[1].decode()
+    matches = re.match(r'.*="[^:]+:(\d+)"', line)
+    return matches.group(1)
+
+
+def get_hidden_service():
+    """Return a string with configured Tor hidden service information"""
+    hs_enabled = False
+    hs_status = 'Ok'
+    hs_hostname = None
+    hs_ports = []
+
+    aug = augeas_load()
+    hs_dir = aug.get(TOR_CONFIG + '/HiddenServiceDir')
+    hs_port_paths = aug.match(TOR_CONFIG + '/HiddenServicePort')
+
+    for hs_port_path in hs_port_paths:
+        port_info = aug.get(hs_port_path).split()
+        hs_ports.append({'virtport': port_info[0],
+                         'target': port_info[1]})
+
+    if not hs_dir:
+        hs_status = 'Not Configured'
+    else:
+        try:
+            with open(os.path.join(hs_dir, 'hostname'), 'r') as conf_file:
+                hs_hostname = conf_file.read().strip()
+                hs_enabled = True
+        except Exception:
+            hs_status = 'Not available (Run Tor at least once)'
+
+    return {'enabled': hs_enabled, 'status': hs_status,
+            'hostname': hs_hostname, 'ports': hs_ports}
+
+
+def _enable():
+    """Enable and start the service."""
+    action_utils.service_enable('tor')
+    _update_ports()
+
+
+def _disable():
+    """Disable and stop the service."""
+    _disable_apt_transport_tor()
+    action_utils.service_disable('tor')
+
+
+def _enable_hs(restart=True):
+    """Enable Tor hidden service"""
+    if get_hidden_service()['enabled']:
+        return
+
+    aug = augeas_load()
+    aug.set(TOR_CONFIG + '/HiddenServiceDir',
+            '/var/lib/tor/hidden_service')
+    aug.set(TOR_CONFIG + '/HiddenServicePort[1]',
+            '22 127.0.0.1:22')
+    aug.set(TOR_CONFIG + '/HiddenServicePort[2]',
+            '80 127.0.0.1:80')
+    aug.set(TOR_CONFIG + '/HiddenServicePort[3]',
+            '443 127.0.0.1:443')
+    aug.save()
+
+    if restart:
+        if is_enabled() and is_running():
+            action_utils.service_restart('tor')
+
+            # wait until hidden service information is available
+            tries = 0
+            while not get_hidden_service()['enabled']:
+                tries += 1
+                if tries >= 12:
+                    return
+
+                time.sleep(10)
+
+
+def _disable_hs(restart=True):
+    """Disable Tor hidden service"""
+    if not get_hidden_service()['enabled']:
+        return
+
+    aug = augeas_load()
+    aug.remove(TOR_CONFIG + '/HiddenServiceDir')
+    aug.remove(TOR_CONFIG + '/HiddenServicePort')
+    aug.save()
+
+    if restart:
+        if is_enabled() and is_running():
+            action_utils.service_restart('tor')
+
+
+def _enable_apt_transport_tor():
+    """Enable package download over Tor."""
+    try:
+        aug = get_augeas()
+    except Exception:
+        # If there was an error, don't proceed
+        print('Error: Unable to understand sources format.')
+        exit(1)
+
+    for uri_path in iter_apt_uris(aug):
+        uri_path = get_real_apt_uri_path(aug, uri_path)
+        uri = aug.get(uri_path)
+        if uri.startswith('http://') or uri.startswith('https://'):
+            aug.set(uri_path, APT_TOR_PREFIX + uri)
+
+    aug.save()
+
+
+def _disable_apt_transport_tor():
+    """Disable package download over Tor."""
+    try:
+        aug = get_augeas()
+    except Exception:
+        # Disable what we can, so APT is not unusable.
+        pass
+
+    for uri_path in iter_apt_uris(aug):
+        uri_path = get_real_apt_uri_path(aug, uri_path)
+        uri = aug.get(uri_path)
+        if uri.startswith(APT_TOR_PREFIX):
+            aug.set(uri_path, uri[len(APT_TOR_PREFIX):])
+
+    aug.save()
+
+
+def _update_ports():
+    """Update firewall service information."""
+    ready = False
+    tries = 0
+
+    # port information may not be available immediately after Tor started
+    while not ready:
+        ports = get_ports()
+        ready = 'orport' in ports and 'obfs3' in ports and 'obfs4' in ports
+        if ready:
+            break
+
+        tries += 1
+        if tries >= 12:
+            return
+
+        time.sleep(10)
+
+    lines = """<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>Tor - {0}</short>
+  <port protocol="tcp" port="{1}"/>
+</service>
+"""
+    for name, number in ports.items():
+        try:
+            with open(SERVICE_FILE.format(name), 'w') as service_file:
+                service_file.writelines(lines.format(name, number))
+        except FileNotFoundError:
+            return
+
+    # XXX: We should ideally do firewalld reload instead.  However,
+    # firewalld seems to fail to successfully reload sometimes.
+    action_utils.service_restart('firewalld')
+
+
+def augeas_load():
+    """Initialize Augeas."""
+    aug = augeas.Augeas(flags=augeas.Augeas.NO_LOAD +
+                        augeas.Augeas.NO_MODL_AUTOLOAD)
+    aug.set('/augeas/load/Tor/lens', 'Tor.lns')
+    aug.set('/augeas/load/Tor/incl[last() + 1]', '/etc/tor/torrc')
+    aug.load()
+    return aug
+
+
+def main():
+    """Parse arguments and perform all duties"""
+    arguments = parse_arguments()
+
+    subcommand = arguments.subcommand.replace('-', '_')
+    subcommand_method = globals()['subcommand_' + subcommand]
+    subcommand_method(arguments)
+
+
+if __name__ == '__main__':
+    main()

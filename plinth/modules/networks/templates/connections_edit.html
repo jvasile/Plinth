@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load bootstrap %}
+{% load i18n %}
+
+{% block content %}
+
+  <div class="row">
+    <div class="col-sm-8">
+      <form class="form" method="post">
+        {% csrf_token %}
+
+        {{ form|bootstrap }}
+
+        <input type="submit" class="btn btn-primary"
+               value="{% trans "Edit Connection" %}"/>
+      </form>
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block page_js %}
+
+  <script type="text/javascript">
+    (function($) {
+
+        function ipv4_required(required, fields) {
+            for (var i = 0; i < fields.length; i++) {
+                $('#id_ipv4_' + fields[i]).prop("required", required);
+            }
+        }
+
+        function ipv4_readonly(readonly, fields) {
+            for (var i = 0; i < fields.length; i++) {
+                $('#id_ipv4_' + fields[i]).prop("readOnly", readonly);
+                if (readonly) {
+                    $('#id_ipv4_' + fields[i]).val("");
+                    $('#id_ipv4_' + fields[i]).prop("required", false);
+                }
+            }
+        }
+
+        function on_ipv4_method_change() {
+            if ($("#id_ipv4_method").prop("value") == "manual") {
+                ipv4_required(true, ['address']);
+                ipv4_readonly(false, ['address', 'netmask', 'gateway', 'dns',
+                                      'second_dns']);
+            } else if ($("#id_ipv4_method").prop("value") == "shared") {
+                ipv4_required(false, ['address']);
+                ipv4_readonly(false, ['address', 'netmask']);
+                ipv4_readonly(true, ['gateway', 'dns', 'second_dns']);
+            } else {
+                ipv4_readonly(true, ['address', 'netmask', 'gateway']);
+                ipv4_readonly(false, ['dns', 'second_dns']);
+            }
+        }
+
+        $("#id_name").focus();
+
+        $("#id_ipv4_method").change(on_ipv4_method_change).change();
+
+        $('#id_show_password').change(function() {
+            // Changing type attribute from password to text is prevented by
+            // most browsers. Making a new form field works.
+            new_type = 'password';
+            if ($('#id_show_password').prop('checked'))
+                new_type = 'text';
+
+            $('#id_password').replaceWith(
+                $('#id_password').clone().attr('type', new_type));
+        });
+
+    })(jQuery);
+  </script>
+
+{% endblock %}

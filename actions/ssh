@@ -1,0 +1,100 @@
+#!/usr/bin/python3
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Configuration helper for SSH server.
+"""
+
+import argparse
+import os
+import pwd
+import shutil
+import stat
+import subprocess
+import sys
+
+
+def parse_arguments():
+    """Return parsed command line arguments as dictionary."""
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='subcommand', help='Sub command')
+
+    get_keys = subparsers.add_parser('get-keys',
+                                     help='Get SSH authorized keys')
+    get_keys.add_argument('--username')
+
+    set_keys = subparsers.add_parser('set-keys',
+                                     help='Set SSH authorized keys')
+    set_keys.add_argument('--username')
+    set_keys.add_argument('--keys')
+
+    return parser.parse_args()
+
+
+def get_user_homedir(username):
+    """Return the home dir of a user by looking up in password database."""
+    try:
+        return pwd.getpwnam(username).pw_dir
+    except KeyError as exception:
+        print('Username not found')
+        sys.exit(1)
+
+
+def subcommand_get_keys(arguments):
+    """Get SSH authorized keys."""
+    user = arguments.username
+
+    path = os.path.join(get_user_homedir(user), '.ssh', 'authorized_keys')
+    try:
+        with open(path, 'r') as file_handle:
+            print(file_handle.read())
+    except FileNotFoundError:
+        pass
+
+
+def subcommand_set_keys(arguments):
+    """Set SSH authorized keys."""
+    user = arguments.username
+
+    ssh_folder = os.path.join(get_user_homedir(user), '.ssh')
+    key_file_path = os.path.join(ssh_folder, 'authorized_keys')
+
+    subprocess.check_call(['mkhomedir_helper', user])
+
+    if not os.path.exists(ssh_folder):
+        os.makedirs(ssh_folder)
+        shutil.chown(ssh_folder, user, 'users')
+
+    with open(key_file_path, 'w') as file_handle:
+        file_handle.write(arguments.keys)
+
+    shutil.chown(key_file_path, user, 'users')
+    os.chmod(key_file_path, stat.S_IRUSR | stat.S_IWUSR)
+
+
+def main():
+    """Parse arguments and perform all duties."""
+    arguments = parse_arguments()
+
+    subcommand = arguments.subcommand.replace('-', '_')
+    subcommand_method = globals()['subcommand_' + subcommand]
+    subcommand_method(arguments)
+
+
+if __name__ == '__main__':
+    main()

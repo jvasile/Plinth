@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load bootstrap %}
+{% load i18n %}
+
+{% block content_row %}
+
+  <div class="col-lg-6 col-lg-offset-3">
+    {% include 'messages.html' %}
+
+    <h2>{% trans "Setup Complete!" %}</h2>
+
+    <p>
+      {% blocktrans trimmed %}
+        {{ box_name }} setup is now complete.  To make your {{ box_name }}
+        functional, you need some applications.  They will be installed
+        the first time you access them.
+      {% endblocktrans %}
+    </p>
+
+    <div class="text-center">
+      <a class="btn btn-lg btn-primary" href="{% url 'apps:index' %}">
+        {% trans "Go to Apps" %}</a>
+    </div>
+
+    <h3>{% trans "Current Network Configuration" %}</h3>
+
+    <p>
+      {% blocktrans trimmed %}
+        You should check the network setup and modify it if necessary.
+        Do not forget to change the default Wi-Fi passwords!
+      {% endblocktrans %}
+    </p>
+
+    {% include "connections_diagram.html" %}
+
+    <div class="text-center">
+      <a class="btn btn-lg btn-primary" href="{% url 'networks:index' %}">
+        {% trans "Go to Networks" %}</a>
+    </div>
+  </div>
+
+{% endblock %}

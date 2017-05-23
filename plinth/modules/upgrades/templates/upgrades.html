@@ -1,0 +1,75 @@
+{% extends 'simple_service.html' %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load i18n %}
+
+{% block page_head %}
+
+  {% if is_busy %}
+    <meta http-equiv="refresh" content="3"/>
+  {% endif %}
+
+{% endblock %}
+
+
+{% block configuration %}
+
+  <p>
+    {% blocktrans trimmed %}
+      Depending on the number of packages to install, this may take a long time
+      to complete.  While upgrades are in progress, you will not be able to
+      install other packages.  During the upgrade, this web interface may be
+      temporarily unavailable and show an error.  Refresh the page to continue.
+    {% endblocktrans %}
+  </p>
+
+  {% if not is_busy %}
+    <form class="form" method="post" action="{% url 'upgrades:upgrade' %}">
+      {% csrf_token %}
+
+      <input type="submit" class="btn btn-primary"
+             value="{% trans "Upgrade now &raquo;" %}"/>
+    </form>
+  {% endif %}
+
+  {% if is_busy %}
+    <p class="running-status-parent">
+      <span class="running-status active"></span>
+      {% trans "A package manager is running." %}
+    </p>
+  {% endif %}
+
+  {% if log %}
+    <h5>{% trans "Recent log from upgrades:" %}</h5>
+
+    <pre>{{ log }}</pre>
+  {% endif %}
+
+{% endblock %}
+
+{% block page_js %}
+  <script>
+    $('.show-details').show();
+    $('.details').hide();
+    $('.show-details').click(function() {
+      $('.details').toggle("slow");
+    });
+  </script>
+{% endblock %}

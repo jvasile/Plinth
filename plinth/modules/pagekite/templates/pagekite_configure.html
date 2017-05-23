@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load bootstrap %}
+{% load i18n %}
+
+{% block content %}
+
+  <form class="form" method="post">
+    {% csrf_token %}
+
+    {% include 'bootstrapform/field.html' with field=form.enabled %}
+
+    <div id='pagekite-post-enabled-form'
+         style='display: {{ form.enabled.value|yesno:'block,none' }};'>
+      <h3>{% trans "PageKite Account" %}</h3>
+      {{ form.server_domain|bootstrap_horizontal }}
+      {{ form.server_port|bootstrap_horizontal }}
+      {{ form.kite_name|bootstrap_horizontal }}
+      {{ form.kite_secret|bootstrap_horizontal }}
+    </div>
+
+    <input type="submit" class="btn btn-primary"
+           value="{% trans "Save settings" %}"/>
+  </form>
+
+{% endblock %}
+
+{% block page_js %}
+
+  <script type="text/javascript">
+    (function($) {
+
+    $('#id_pagekite-enabled').change(function() {
+      if ($('#id_pagekite-enabled').prop('checked')) {
+        $('#pagekite-post-enabled-form').show('slow');
+      } else {
+        $('#pagekite-post-enabled-form').hide('slow');
+      }
+    });
+
+    })(jQuery);
+  </script>
+{% endblock %}

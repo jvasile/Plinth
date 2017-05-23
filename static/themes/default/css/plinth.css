@@ -1,0 +1,56 @@
+body {
+    padding-top: 70px;
+}
+
+.nav .glyphicon,
+.sidebar .glyphicon {
+    margin-right: 4px;
+}
+
+.navbar-brand img {
+    float: left;
+    margin-top: -14px;
+    padding: 8px;
+}
+
+.nav-tabs {
+    margin-bottom: 20px;
+}
+
+.running-status-parent {
+    display: inline-block;
+}
+
+.running-status {
+    border-radius: 50%;
+    border: 1px solid black;
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+}
+
+.running-status.active {
+    background-color: rgb(0, 167, 0);
+}
+
+.running-status.inactive {
+    background-color: rgb(228, 66, 66);
+}
+
+.form-diagnostics-button {
+    display: inline-block;
+}
+
+/* Hide log out button if user dropdown is available */
+.js #logout-nojs {
+    display: none;
+}
+
+/* Hide the dropdown icon when javascript is not available */
+.no-js .nav .dropdown .caret {
+    display: none;
+}
+
+.diagnostics-results .diagnostics-result {
+    width: 60px;
+}

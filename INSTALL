@@ -1,50 +1,50 @@
-# Quick Start
+# Installing Plinth
 
-## Installing Plinth
+1. Install the dependencies:
 
-Install the python-cheetah package, pandoc, python-augeas, and
-bjsonrpc:
+    On a Debian based system, run:
 
-apt-get install python-cheetah pandoc python-augeas python-bjsonrpc python-cherrypy3 python-simplejson
+    $ sudo apt-get install \
+    augeas-tools \
+    dblatex \
+    gettext \
+    gir1.2-glib-2.0 \
+    gir1.2-networkmanager-1.0 \
+    gir1.2-packagekitglib-1.0 \
+    ldapscripts \
+    libjs-bootstrap \
+    libjs-jquery \
+    libjs-modernizr \
+    make \
+    network-manager \
+    packagekit \
+    ppp \
+    pppoe \
+    python3 \
+    python3-augeas \
+    python3-bootstrapform \
+    python3-cherrypy3 \
+    python3-coverage \
+    python3-django \
+    python3-django-stronghold \
+    python3-gi \
+    python3-psutil \
+    python3-requests \
+    python3-setuptools \
+    python3-yaml \
+    xmlto
 
-Unzip and untar the source into a directory.  Change to the directory
-containing the program. Run:
+2. Install Plinth:
 
-    $ make
+    Unzip the source into a directory.  Change to the directory containing the
+    program and run:
 
-To start Plinth, run:
+    $ sudo python3 setup.py install
 
-    $ ./start.sh
+3. Run Plinth:
 
-and point your web browser at `localhost:8000`. The default username is "admin"
-and the default password is "secret".
+    $ sudo plinth
 
-## Dependencies
+4. Access Plinth UI:
 
-* cherrypy - python web engine v3+
-
-* cheetah - Debian has python-cheetah package
-
-* python - tested with version 2.6.6
-
-* *GNU Make* is used to build the templates and such.
-
-* bjsonrpc - used for configuration management layer
-
-* python-augeas and augeas - used for configuration management
-
-The documentation has some dependencies too.
-
-* *Markdown* is used to format and style docs.
-
-* *Pandoc* converts the markdown to different formats.
-
-* *PDFLatex* generates pdf versions of the documentation.
-
-* *GNU Make* processes /doc/Makefile.
-
-## Building the Documentation
-
-Documentation has been collected into a pdf that can be built using
-`make doc`.  It also gets built into smaller files and other formats,
-including one suitable for install as a man page.
+    Plinth UI should be accessible at http://localhost:8000

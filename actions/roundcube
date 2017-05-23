@@ -1,0 +1,95 @@
+#!/usr/bin/python3
+# -*- mode: python -*-
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Configuration helper for Roundcube server.
+"""
+
+import argparse
+import re
+import subprocess
+
+from plinth import action_utils
+
+
+APACHE_CONF = '/etc/apache2/conf-available/roundcube.conf'
+
+
+def parse_arguments():
+    """Return parsed command line arguments as dictionary."""
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='subcommand', help='Sub command')
+
+    subparsers.add_parser('pre-install',
+                          help='Perform Roundcube pre-install configuration')
+    subparsers.add_parser('setup',
+                          help='Perform Roundcube configuration setup')
+    subparsers.add_parser('enable', help='Enable Roundcube')
+    subparsers.add_parser('disable', help='Disable Roundcube')
+
+    return parser.parse_args()
+
+
+def subcommand_pre_install(_):
+    """Preseed debconf values before packages are installed."""
+    subprocess.check_output(
+        ['debconf-set-selections'],
+        input=b'roundcube-core roundcube/dbconfig-install boolean true')
+    subprocess.check_output(
+        ['debconf-set-selections'],
+        input=b'roundcube-core roundcube/database-type string sqlite3')
+
+
+def subcommand_setup(_):
+    """Setup Roundcube Apache configuration."""
+    with open(APACHE_CONF, 'r') as conffile:
+        lines = conffile.readlines()
+
+    with open(APACHE_CONF, 'w') as conffile:
+        for line in lines:
+            match = re.match(r'#\s*(Alias /roundcube.*)', line)
+            if match:
+                conffile.write(match.group(1) + '\n')
+            else:
+                conffile.write(line)
+
+    action_utils.service_reload('apache2')
+
+
+def subcommand_enable(_):
+    """Enable web configuration and reload."""
+    action_utils.webserver_enable('roundcube')
+
+
+def subcommand_disable(_):
+    """Disable web configuration and reload."""
+    action_utils.webserver_disable('roundcube')
+
+
+def main():
+    """Parse arguments and perform all duties."""
+    arguments = parse_arguments()
+
+    subcommand = arguments.subcommand.replace('-', '_')
+    subcommand_method = globals()['subcommand_' + subcommand]
+    subcommand_method(arguments)
+
+
+if __name__ == '__main__':
+    main()

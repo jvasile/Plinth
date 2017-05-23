@@ -1,0 +1,139 @@
+{% extends "simple_service.html" %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load bootstrap %}
+{% load i18n %}
+
+{% block page_head %}
+
+  {% if config_running %}
+    <meta http-equiv="refresh" content="3" />
+  {% endif %}
+
+{% endblock %}
+
+
+{% block configuration %}
+
+  <h3>{% trans "Status" %}</h3>
+
+  {% if config_running %}
+
+    <p class="running-status-parent">
+      <span class="running-status active"></span>
+      {% trans "Tor configuration is being updated" %}
+    </p>
+
+  {% else %}
+
+    <p class="running-status-parent">
+      {% if status.is_running %}
+        <span class="running-status active"></span>
+        {% trans "Tor is running" %}
+      {% else %}
+        <span class="running-status inactive"></span>
+        {% trans "Tor is not running" %}
+      {% endif %}
+    </p>
+
+    {% include "diagnostics_button.html" with module="tor" %}
+
+    {% if status.hs_enabled %}
+      <div class="row">
+        <div class="col-sm-3">
+          <table class="table table-bordered table-condensed table-striped">
+            <thead>
+              <tr>
+                <th>{% trans "Hidden Service" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Ports" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ status.hs_hostname }}</td>
+                <td>{{ status.hs_status }}</td>
+                <td>
+                  {% for service in status.hs_services %}
+                    {{ service }}
+                  {% endfor %}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    <h3>{% trans "Configuration" %}</h3>
+
+    <form class="form" method="post">
+      {% csrf_token %}
+
+      {{ form|bootstrap }}
+
+      <input type="submit" class="btn btn-primary btn-md"
+             value="{% trans "Update setup" %}"/>
+    </form>
+
+    <h3>{% trans "Bridge" %}</h3>
+
+    <p>
+      {% blocktrans trimmed %}
+        Your {{ box_name }} is configured as a Tor bridge with obfsproxy,
+        so it can help circumvent censorship. If your {{ box_name }} is
+        behind a router or firewall, you should make sure the following
+        ports are open, and port-forwarded, if necessary:
+      {% endblocktrans %}
+    </p>
+
+    <div class="row">
+      <div class="col-sm-3">
+        <table class="table table-bordered table-condensed table-striped">
+          <thead>
+            <tr>
+              <th>{% trans "Service" %}</th>
+              <th>{% trans "Port" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for name, port in status.ports.items %}
+              <tr>
+                <td>{{ name }}</td>
+                <td>{{ port }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>{% trans "SOCKS" %}</h3>
+
+    <p>
+      {% blocktrans trimmed %}
+        A Tor SOCKS port is available on your {{ box_name }} on TCP port
+        9050.
+      {% endblocktrans %}
+    </p>
+
+  {% endif %}
+
+{% endblock %}

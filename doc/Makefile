@@ -1,120 +1,78 @@
-DOCDIR=../dist/doc
+#!/usr/bin/make -f
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 
-PANDOC=pandoc
-PDFLATEX=pdflatex
+MANUAL_URL="https://wiki.debian.org/FreedomBox/Manual?action=show&mimetype=text%2Fdocbook"
 
+OUTPUTS=freedombox-manual.pdf freedombox-manual.html freedombox-manual.part.html plinth.1
 
-# List text files in the order in which you want them to appear in the
-# complete manual:
-SOURCES=README.mdwn INSTALL.mdwn themes.mdwn hacking.mdwn TODO.mdwn modules.mdwn scripts.mdwn faq.mdwn COPYING.mdwn colophon.mdwn
-OTHER=
-TODO_SOURCES=$(patsubst TODO.mdwn,,$(SOURCES))
-MAN_SOURCES=$(patsubst COPYING.mdwn,copyright_notice00,$(SOURCES))
+# In order to debug various problems with the documents especially
+# intermediate LaTeX state, run make as follows:
+#
+#   $ make DEBUG=true
+#   or
+#   $ make DEBUG=true <target>
+#
+XMLTO_DEBUG_FLAGS=
+ifneq ($(DEBUG),)
+    XMLTO_DEBUG_FLAGS=--noclean -p '--debug'
+endif
 
-NEWLINE_SOURCES=$(patsubst %,% oneline.txt,$(SOURCES))
-NEWLINE_MAN_SOURCES=$(patsubst %,% oneline.txt,$(MAN_SOURCES))
+all: $(OUTPUTS)
 
-HTML=plinth.html $(patsubst %.mdwn,%.html,$(SOURCES))
-HTML_PART=$(patsubst %.html,%.part.html,$(HTML))
-LATEX=plinth.tex $(patsubst %.mdwn,%.tex,$(SOURCES))
-PDF=plinth.pdf $(patsubst %.mdwn,%.pdf,$(SOURCES))
-MAN=plinth.1
-
-## If you want PDF or Latex files, do them separately.  They're not made by default.
-
-OUTPUTS=$(HTML) $(MAN) $(HTML_PART)
-DIST_OUTPUT=$(patsubst %,$(DOCDIR)/%,$(OUTPUTS))
-
-# Yes, do it twice. TODO created during the process requires a second run
-default:
-	make all
-all: oneline.txt $(OUTPUTS) Makefile
-
-$(DOCDIR)/%: %
-	cp $< $@
-dist: $(DIST_OUTPUT)
-###############################################################################
-oneline.txt: Makefile
-	perl -e 'print "\n"' > oneline.txt
-
-$(SOURCES):
-	@rm -f $@
-	@ln -s ../$(patsubst %.mdwn,%,$@) $@
-
-../TODO : $(TODO_SOURCES) ../*.py ../modules/*.py ../Makefile Makefile ../templates/Makefile
-	grep -ro --exclude=.git* --exclude=plinth.1 --exclude=*.tex --exclude=*.html \
-	     --exclude=README.mdwn --exclude=INSTALL.mdwn \
-	     --exclude=TODO.mdwn --exclude=COPYING.mdwn \
-	     "TODO\:.*" ../* 2>/dev/null | \
-	     sed -e "s/TODO\://g" | \
-	     sed -e "s/^..\//* /g" | \
-	     sed -e 's/"""$$//g' | \
-	     sed -e 's/<\/p>$$//g' \
-	     > ../TODO
-###############################################################################
-##
-## MAN PAGES
-##
-$(MAN): $(SOURCES) ../TODO
-	@csplit -s -f copyright_notice COPYING.mdwn '/##/'
-	cat $(NEWLINE_MAN_SOURCES) | perl -pe 'BEGIN { $$/=undef } $$_ =~ s/\n\n#\s.*/\n/gm; $$_ =~ s/\n\n#/\n\n/gm; $$_ =~ s/(\n\n#\s.*)/uc($$1)/gme' > .make_man
-	$(PANDOC) -s -t man -o $@ .make_man
-	@rm -f copyright_notice0? .make_man
-manpages: $(MAN)
-###############################################################################
-##
-## LaTeX
-##
-%.tex: %.mdwn
-	$(PANDOC) -s --toc -f markdown --standalone -o $@ $<
-
-hacking.tex: hacking.mdwn ../TODO
-	$(PANDOC) -s --toc -f markdown -o $@ hacking.mdwn ../TODO
-
-plinth.tex: $(NEWLINE_SOURCES) ../TODO
-	$(PANDOC) -s --toc -f markdown -o $@ $(NEWLINE_SOURCES)
-
-latex: $(LATEX)
-###############################################################################
-##
-## HTML
-##
+# Do not edit the manual page in this directory.  The manual is
+# maintained as separate pages on the FreedomBox wiki and aggregated
+# into a single page using the MoinMoin include feature.  Then it is
+# exported as Docbook format and kept here.
+#
+# It is important to keep a copy of the manual in this source tree
+# because Debian packages promise an entire source tree including the
+# documentation.
+#
+# Use 'make fetch' to retrieve the latest manual from the wiki and
+# commit it to the repository.  The wiki page is already reviewed, so
+# commits that update the manual just using the 'fetch' target do not
+# require further reviews.
+.PHONY: fetch
+fetch:
+	wget --quiet -O - $(MANUAL_URL) | \
+	  xmllint --format --output freedombox-manual.raw.xml -
+	xsltproc --output freedombox-manual.xml fixes.xslt freedombox-manual.raw.xml
+	xsltproc fetch-images.xslt freedombox-manual.raw.xml | sort -u | \
+	  awk '{print "wget --quiet -O images/" $$1 " " $$2}' | sh
+	rm -f freedombox-manual.raw.xml
 
 
-# This gets us the html sections complete with TOC, but without the
-# HTML and head section boilerplate.  /help/view uses the parts.
+%.pdf: %.xml
+	xmlto $(XMLTO_DEBUG_FLAGS) --with-dblatex pdf $<
+
+
 %.part.html: %.html
-	csplit -s -f $@ $< '%.*<body>%'
-	sed '1d' $@00 > $@01
-	csplit -s -f $@ $@01 '/<\/body>/'
-	mv $@00 $@
-	rm $@01
-%.html: %.mdwn header.html footer.html style.css Makefile
-	$(PANDOC) -s --toc -c style.css -f markdown -o $@ header.html $< footer.html
+	perl -pe 'BEGIN {undef $/} s/.*<body[^>]*>(.*)<\/body>.*/$1/s' $< > $@
 
-hacking.html: hacking.mdwn ../TODO style.css Makefile
-	$(PANDOC) -s --toc -c style.css -o $@ -f markdown hacking.mdwn ../TODO
 
-#plinth.html: $(NEWLINE_SOURCES) ../TODO style.css Makefile
-#	$(PANDOC) -s --toc -c style.css -o $@ -f markdown $(NEWLINE_SOURCES)
+%.html: %.xml
+	docbook2html --nochunks $<
 
-plinth.html: $(NEWLINE_SOURCES) ../TODO style.css Makefile
-	@csplit -s -f copyright_notice COPYING.mdwn '/##/'
-	$(PANDOC) -s --toc -c style.css -o $@ -f markdown $(NEWLINE_MAN_SOURCES)
-	@rm -f copyright_notice0? .make_man
 
-html: $(HTML) $(HTML_PART)
-###############################################################################
-%.pdf: %.tex
-	$(PDFLATEX) -interaction=batchmode $< >/dev/null
-	$(PDFLATEX) -interaction=batchmode $< >/dev/null  # yes, do it twice so the toc works
+%.1: %.xml
+	xmlto man $<
 
-pdf: $(PDF)
-###############################################################################
 
-clean-latex:
-	rm -f *.log *.out *.aux *.toc *.tex
-
-clean: clean-latex
-	rm -f $(OUTPUTS) README.mdwn INSTALL.mdwn TODO.mdwn COPYING.mdwn \
-	     copyright_notice0? \#*\# ../TODO oneline.txt *.pdf
+.PHONY: clean
+clean:
+	rm -f $(OUTPUTS)

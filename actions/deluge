@@ -1,0 +1,96 @@
+#!/usr/bin/python3
+# -*- mode: python -*-
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Configuration helper for BitTorrent web client.
+"""
+
+import argparse
+import os
+import subprocess
+
+from plinth import action_utils
+
+
+SYSTEMD_SERVICE_PATH = '/etc/systemd/system/deluge-web.service'
+SYSTEMD_SERVICE = '''
+#
+# This file is managed and overwritten by Plinth.  If you wish to edit
+# it, disable Deluge in Plinth, remove this file and manage it manually.
+#
+[Unit]
+Description=Deluge Web Interface
+Documentation=man:deluge-web(1)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/deluge-web --base=deluge
+Restart=on-failure
+User=debian-deluged
+Group=debian-deluged
+
+[Install]
+WantedBy=multi-user.target
+'''
+
+
+def parse_arguments():
+    """Return parsed command line arguments as dictionary."""
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='subcommand', help='Sub command')
+
+    subparsers.add_parser('enable', help='Enable deluge-web site')
+    subparsers.add_parser('disable', help='Disable deluge-web site')
+
+    return parser.parse_args()
+
+
+def subcommand_enable(_):
+    """Enable deluge-web site and start deluge-web."""
+    setup()
+    action_utils.service_enable('deluge-web')
+    action_utils.webserver_enable('deluge-plinth')
+
+
+def subcommand_disable(_):
+    """Disable deluge-web site and stop deluge-web."""
+    action_utils.webserver_disable('deluge-plinth')
+    action_utils.service_disable('deluge-web')
+
+
+def setup():
+    """Perform initial setup for deluge-web."""
+    if not os.path.isfile(SYSTEMD_SERVICE_PATH):
+        with open(SYSTEMD_SERVICE_PATH, 'w') as file_handle:
+            file_handle.write(SYSTEMD_SERVICE)
+
+        subprocess.check_call(['systemctl', 'daemon-reload'])
+
+
+def main():
+    """Parse arguments and perform all duties."""
+    arguments = parse_arguments()
+
+    subcommand = arguments.subcommand.replace('-', '_')
+    subcommand_method = globals()['subcommand_' + subcommand]
+    subcommand_method(arguments)
+
+
+if __name__ == '__main__':
+    main()

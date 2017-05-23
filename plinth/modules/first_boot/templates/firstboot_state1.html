@@ -1,0 +1,55 @@
+{% extends "base_firstboot.html" %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load bootstrap %}
+{% load i18n %}
+{% load static %}
+
+{% block content_row %}
+  <div class="col-md-6 col-md-offset-3">
+    {% include 'messages.html' %}
+
+    <h2>{% trans "Administrator Account" %}</h2>
+
+    <p>
+      {% blocktrans trimmed %}
+        Choose a username and password to access this web interface.
+        The password can be changed later. This user will be granted
+        administrative privileges. Other users can be added later.
+      {% endblocktrans %}
+    </p>
+
+    <form class="form" method="post">
+      {% csrf_token %}
+
+      {{ form|bootstrap }}
+
+      <input type="submit" class="btn btn-primary"
+             value="{% trans "Box it up!" %}"/>
+    </form>
+
+  </div>
+{% endblock %}
+
+{% block page_js %}
+  <script>
+    $('#id_username').focus();
+  </script>
+{% endblock %}

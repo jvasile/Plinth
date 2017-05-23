@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% comment %}
+#
+# This file is part of Plinth.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+{% endcomment %}
+
+{% load i18n %}
+{% load firstboot_extras %}
+{% load static %}
+
+
+{# Adapt mainmenu-links during firstboot #}
+{% block mainmenu_left %}
+
+  {% firstboot_is_finished as firstboot_finished %}
+  {% if not firstboot_finished %}
+
+    <span class="navbar-brand">
+      <img src="{% static 'theme/img/freedombox-logo-32px.png' %}"
+           alt="{{ cfg.box_name }}" />
+      <a href="{% url 'index' %}">
+        {% blocktrans trimmed %}{{ box_name }} Setup{% endblocktrans %}
+      </a>
+    </span>
+
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+
+{% endblock %}
+
+
+{% block mainmenu_right %}
+
+  {% firstboot_is_finished as firstboot_finished %}
+  {% if not firstboot_finished %}
+    {% include "firstboot_navbar.html" %}
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+
+{% endblock %}
